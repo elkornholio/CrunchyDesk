@@ -1,11 +1,28 @@
 const { ipcRenderer } = require('electron');
 
 let currentTheme = 'dark';
-let autoSkipEnabled = true;
+let autoSkipEnabled = localStorage.getItem('cr_auto_skip') !== 'false';
 let autoNextEnabled = true;
 let isAppBarCollapsed = false;
 let currentShader = localStorage.getItem('cr_anime_shader') || 'default';
 let navState = { canGoBack: false, canGoForward: false };
+
+function setAutoSkipEnabled(enabled) {
+  autoSkipEnabled = Boolean(enabled);
+  try {
+    localStorage.setItem('cr_auto_skip', String(autoSkipEnabled));
+  } catch (_) {}
+  const autoSkipBtn = document.getElementById('cr-auto-skip-btn');
+  if (autoSkipBtn) {
+    autoSkipBtn.classList.toggle('active', autoSkipEnabled);
+    const labelSpan = autoSkipBtn.querySelector('span:last-child');
+    if (labelSpan) labelSpan.textContent = autoSkipEnabled ? 'Skip: ON' : 'Skip: OFF';
+  }
+  showToast(`Auto-Skip: ${autoSkipEnabled ? 'ON' : 'OFF'}`);
+  if (autoSkipEnabled) {
+    checkAndAutoSkip();
+  }
+}
 
 // Local persistent watched cache (syncs alongside Crunchyroll's server playheads API)
 function getLocalWatchedMap() {
@@ -1881,8 +1898,7 @@ function openCommandPalette() {
       if (action === 'pip') triggerPictureInPicture();
       if (action === 'shader') cycleShader();
       if (action === 'skip') {
-        autoSkipEnabled = !autoSkipEnabled;
-        showToast(`Auto-Skip: ${autoSkipEnabled ? 'ON' : 'OFF'}`);
+        setAutoSkipEnabled(!autoSkipEnabled);
       }
     });
   });
@@ -2022,10 +2038,7 @@ function createAppBar() {
   // Hook Auto-Skip
   const autoSkipBtn = document.getElementById('cr-auto-skip-btn');
   autoSkipBtn.addEventListener('click', () => {
-    autoSkipEnabled = !autoSkipEnabled;
-    autoSkipBtn.classList.toggle('active', autoSkipEnabled);
-    autoSkipBtn.querySelector('span:last-child').textContent = autoSkipEnabled ? 'Skip: ON' : 'Skip: OFF';
-    showToast(`Auto-Skip: ${autoSkipEnabled ? 'ON' : 'OFF'}`);
+    setAutoSkipEnabled(!autoSkipEnabled);
   });
 
   // Hook Shader Cycle
@@ -2193,7 +2206,10 @@ function attachVideoListeners(video) {
   video.addEventListener('playing', notifyState);
   video.addEventListener('pause', notifyState);
   video.addEventListener('ended', notifyState);
-  video.addEventListener('timeupdate', notifyState);
+  video.addEventListener('timeupdate', () => {
+    notifyState();
+    checkAndAutoSkip();
+  });
 
   notifyState();
 }
@@ -2264,34 +2280,129 @@ function syncMediaSessionAndRPC(video) {
   });
 }
 
-// Auto-Skip Intro, Recap, & Auto-Next Episode (Targeted and safe)
+// Cache of skip-events intervals per episode ID from https://static.crunchyroll.com/skip-events/production/<ID>.json
+const skipEventsCache = {};
+let lastAutoSkipTime = 0;
+
+function ensureEpisodeSkipEvents(epId) {
+  if (!epId) return Promise.resolve([]);
+  if (skipEventsCache[epId]) return skipEventsCache[epId];
+
+  skipEventsCache[epId] = fetch(`https://static.crunchyroll.com/skip-events/production/${epId}.json`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (!data || typeof data !== 'object') return [];
+      const segments = [];
+      for (const [key, val] of Object.entries(data)) {
+        if (
+          val &&
+          typeof val === 'object' &&
+          typeof val.start === 'number' &&
+          typeof val.end === 'number' &&
+          val.end > val.start
+        ) {
+          segments.push({
+            type: val.type || key,
+            start: val.start,
+            end: val.end
+          });
+        }
+      }
+      return segments.sort((a, b) => a.start - b.start);
+    })
+    .catch(() => []);
+
+  return skipEventsCache[epId];
+}
+
+function findNextEpisodeButton() {
+  const katamariIcon = document.querySelector('[data-testid="next-episode-icon"]');
+  if (katamariIcon) {
+    const btn = katamariIcon.closest('button, a, [role="button"]');
+    if (btn) return btn;
+  }
+  return document.querySelector(
+    'button[aria-label="Next Episode"], [data-t="next-episode-btn"], [data-t="play-next-btn"], .next-episode-btn, button[class*="next-episode"]'
+  );
+}
+
+// Auto-Skip Intro, Recap, & Auto-Next Episode (Katamari DOM Button + Direct Skip-Events Timestamp Seek)
 function checkAndAutoSkip() {
   try {
-    // 1. Skip Intro / Recap (strictly match explicit skip intro/recap buttons)
-    if (autoSkipEnabled) {
-      const skipBtn = document.querySelector(
+    const now = Date.now();
+    const videos = getActiveVideos();
+    const video = videos[0];
+
+    // 1. Skip Intro / Recap / Promo / Bumper / Credits
+    if (autoSkipEnabled && now - lastAutoSkipTime > 2500) {
+      // A) Check Crunchyroll Katamari player skip button ([data-testid="skip-intro-icon"] inside button)
+      const katamariSkipIcon = document.querySelector('[data-testid="skip-intro-icon"]');
+      const katamariSkipBtn = katamariSkipIcon ? katamariSkipIcon.closest('button') : null;
+      if (
+        katamariSkipBtn &&
+        !katamariSkipBtn.disabled &&
+        katamariSkipBtn.getAttribute('aria-hidden') !== 'true' &&
+        !katamariSkipBtn.className.includes('opacity-0')
+      ) {
+        const label =
+          katamariSkipBtn.getAttribute('aria-label') ||
+          (katamariSkipBtn.innerText || '').trim() ||
+          'Intro';
+        lastAutoSkipTime = now;
+        katamariSkipBtn.click();
+        showToast(`⚡ Auto-Skipped: ${label}`);
+        return;
+      }
+
+      // B) Check legacy Vilos / testid skip buttons
+      const legacySkipBtn = document.querySelector(
         '[data-t="skip-intro-btn"], [data-t="skip-recap-btn"], [data-t="skip-button"], ' +
           '[data-testid="skipButton"], [data-testid="skip-intro-button"], ' +
           '.vjs-skip-intro, .vjs-skip-recap'
       );
-      if (skipBtn && skipBtn.offsetParent !== null && !skipBtn.disabled) {
-        skipBtn.click();
+      if (
+        legacySkipBtn &&
+        legacySkipBtn.offsetParent !== null &&
+        !legacySkipBtn.disabled &&
+        legacySkipBtn.getAttribute('aria-hidden') !== 'true'
+      ) {
+        lastAutoSkipTime = now;
+        legacySkipBtn.click();
+        showToast('⚡ Auto-Skipped Intro/Recap');
         return;
+      }
+
+      // C) Direct timestamp skip via Crunchyroll's skip-events API (works even when player UI is auto-hidden)
+      const match = window.location.pathname.match(/\/watch\/([A-Z0-9]+)/i);
+      const epId = match ? match[1] : null;
+      if (epId && video && !video.paused && video.currentTime > 0) {
+        ensureEpisodeSkipEvents(epId).then((segments) => {
+          if (!autoSkipEnabled || !segments || segments.length === 0) return;
+          if (Date.now() - lastAutoSkipTime <= 2500) return;
+          const ct = video.currentTime;
+          const activeSeg = segments.find(
+            (s) => ct >= s.start && ct < s.end - 1.5
+          );
+          if (activeSeg) {
+            lastAutoSkipTime = Date.now();
+            video.currentTime = activeSeg.end;
+            const segLabel =
+              activeSeg.type.charAt(0).toUpperCase() + activeSeg.type.slice(1);
+            showToast(`⚡ Auto-Skipped ${segLabel}`);
+          }
+        });
       }
     }
 
     // 2. Smart Auto-Next Episode (only when active video has ended or is within the last 5 seconds)
-    if (autoNextEnabled) {
-      const videos = getActiveVideos();
-      const video = videos[0];
+    if (autoNextEnabled && video) {
       const isAtEndOfEpisode =
-        video && (video.ended || (video.duration > 60 && video.currentTime >= video.duration - 5));
+        video.ended || (video.duration > 60 && video.currentTime >= video.duration - 5);
 
-      if (isAtEndOfEpisode) {
-        const nextBtn = document.querySelector(
-          '[data-t="next-episode-btn"], [data-t="play-next-btn"], .next-episode-btn'
-        );
+      if (isAtEndOfEpisode && now - lastAutoSkipTime > 4000) {
+        const nextBtn = findNextEpisodeButton();
         if (nextBtn && nextBtn.offsetParent !== null && !nextBtn.disabled) {
+          lastAutoSkipTime = now;
           nextBtn.click();
           showToast('Auto-Playing Next Episode...');
           return;
@@ -2349,7 +2460,7 @@ ipcRenderer.on('media-play-pause', () => {
 });
 
 ipcRenderer.on('media-next', () => {
-  const nextBtn = document.querySelector('[data-t="next-episode-btn"], button[class*="next-episode"]');
+  const nextBtn = findNextEpisodeButton();
   if (nextBtn) {
     nextBtn.click();
     showToast('Next Episode');
