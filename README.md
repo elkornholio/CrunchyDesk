@@ -28,6 +28,7 @@
 - **Smart Auto-Skip & Auto-Next**: Automatically skips intros and recaps and seamlessly queues up the next episode.
 - **Anime Visual Enhancer (Shaders)**: Switch between custom post-processing presets (*Natural*, *Vibrant Anime*, *Crisp Detail*, *Cinematic OLED*, and *Warm Retro*).
 - **Precision Speed Control**: Adjust playback rate in smooth `0.25x` increments (`0.25x` to `3.0x`) with on-screen toast feedback.
+- **Fit Video to Window Mode**: Expand the active video player to fill the entire application window (`T` / `Esc` or top bar icon) without forcing OS fullscreen.
 - **Picture-in-Picture & Floating Mini-Player**: Watch anime in an always-on-top floating window (`P`).
 - **Power-Save Blocker**: Prevents system idle sleep and screensavers while video is playing.
 
@@ -50,6 +51,7 @@
 | **`Shift + W`** | Mark current episode as **Unwatched (Not Watched)** |
 | **`Alt + ←`** / **`Alt + →`** | Navigate Page Back / Forward |
 | **`[`** / **`]`** | Decrease / Increase playback speed (`0.25x` steps) |
+| **`T`** / **`Esc`** | Toggle **Fit Video to Window** mode |
 | **`P`** | Toggle Picture-in-Picture / Floating Mini-Player |
 | **`Space`** / **`K`** | Play / Pause video |
 | **`F`** | Toggle Fullscreen mode |

@@ -4,6 +4,7 @@ let currentTheme = 'dark';
 let autoSkipEnabled = localStorage.getItem('cr_auto_skip') !== 'false';
 let autoNextEnabled = true;
 let isAppBarCollapsed = false;
+let isFitToWindow = false;
 let currentShader = localStorage.getItem('cr_anime_shader') || 'default';
 let navState = { canGoBack: false, canGoForward: false };
 
@@ -56,6 +57,7 @@ const ICONS = {
   watchlist: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>`,
   zap: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
   speed: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  fitWindow: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`,
   pip: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="10" width="8" height="6" rx="1"/></svg>`,
   palette: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
   moon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
@@ -1125,6 +1127,55 @@ const customStyles = `
     top: 0 !important;
   }
 
+  /* Fit Video Player to Window Mode */
+  body.cr-fit-window {
+    overflow: hidden !important;
+  }
+
+  body.cr-fit-window .erc-large-header,
+  body.cr-fit-window .erc-large-header-shell,
+  body.cr-fit-window .erc-header,
+  body.cr-fit-window .erc-sticky-header {
+    display: none !important;
+  }
+
+  body.cr-fit-window .erc-watch-episode-layout .video-player-wrapper,
+  body.cr-fit-window .video-player-wrapper {
+    position: fixed !important;
+    top: 34px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: calc(100vh - 34px) !important;
+    max-height: calc(100vh - 34px) !important;
+    z-index: 999990 !important;
+    background: #000000 !important;
+  }
+
+  body.cr-fit-window:has(#cr-app-bar.collapsed) .erc-watch-episode-layout .video-player-wrapper,
+  body.cr-fit-window:has(#cr-app-bar.collapsed) .video-player-wrapper,
+  :fullscreen body.cr-fit-window .erc-watch-episode-layout .video-player-wrapper,
+  :fullscreen body.cr-fit-window .video-player-wrapper {
+    top: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+  }
+
+  body.cr-fit-window .erc-watch-episode-layout .video-player-spacer,
+  body.cr-fit-window .video-player-spacer {
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 100% !important;
+  }
+
+  body.cr-fit-window .erc-watch-episode-layout .video-player,
+  body.cr-fit-window .video-player {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+  }
+
   /* Sleek Scrollbars */
   ::-webkit-scrollbar {
     width: 6px !important;
@@ -1260,6 +1311,12 @@ const customStyles = `
 
   .cr-icon-btn:active {
     transform: scale(0.96) !important;
+  }
+
+  .cr-icon-btn.active {
+    background: var(--cr-bg-active) !important;
+    border-color: rgba(255, 100, 0, 0.45) !important;
+    color: var(--cr-accent) !important;
   }
 
   /* Discovery Quick Pills */
@@ -1845,6 +1902,10 @@ function openCommandPalette() {
           <span>🔖 My Watchlist</span>
           <span class="cr-shortcut-tag">Jump</span>
         </div>
+        <div class="cr-palette-item" data-action="fit-window">
+          <span>🖥️ Toggle Fit Video to Window</span>
+          <span class="cr-shortcut-tag">T</span>
+        </div>
         <div class="cr-palette-item" data-action="pip">
           <span>📺 Toggle Picture-in-Picture</span>
           <span class="cr-shortcut-tag">P</span>
@@ -1895,6 +1956,7 @@ function openCommandPalette() {
       if (action === 'explore') ipcRenderer.send('nav-url', 'https://www.crunchyroll.com/videos/popular');
       if (action === 'simulcasts') ipcRenderer.send('nav-url', 'https://www.crunchyroll.com/simulcasts');
       if (action === 'watchlist') ipcRenderer.send('nav-url', 'https://www.crunchyroll.com/watchlist');
+      if (action === 'fit-window') toggleFitToWindow();
       if (action === 'pip') triggerPictureInPicture();
       if (action === 'shader') cycleShader();
       if (action === 'skip') {
@@ -1984,6 +2046,10 @@ function createAppBar() {
         ${ICONS.speed} <span id="cr-speed-text">1.0x</span>
       </button>
 
+      <button class="cr-icon-btn ${isFitToWindow ? 'active' : ''}" id="cr-fit-btn" title="Fit Video to Window (T)">
+        ${ICONS.fitWindow}
+      </button>
+
       <button class="cr-icon-btn" id="cr-pip-btn" title="Picture-in-Picture (P)">
         ${ICONS.pip}
       </button>
@@ -2060,6 +2126,9 @@ function createAppBar() {
     document.getElementById('cr-speed-text').textContent = `${nextRate}x`;
     showToast(`Speed: ${nextRate}x`);
   });
+
+  // Hook Fit Video to Window
+  document.getElementById('cr-fit-btn').addEventListener('click', () => toggleFitToWindow());
 
   // Hook PiP
   document.getElementById('cr-pip-btn').addEventListener('click', triggerPictureInPicture);
@@ -2412,6 +2481,31 @@ function checkAndAutoSkip() {
   } catch (e) {}
 }
 
+// Toggle Fit Video Player to Window (Theater / Full-Window Mode)
+function toggleFitToWindow(forceState) {
+  const hasPlayer =
+    window.location.pathname.includes('/watch/') ||
+    Boolean(document.querySelector('.video-player-wrapper')) ||
+    getActiveVideos().length > 0;
+
+  if (!hasPlayer && forceState !== false) {
+    showToast('Open an episode to use Fit to Window');
+    return;
+  }
+
+  isFitToWindow = typeof forceState === 'boolean' ? forceState : !isFitToWindow;
+  if (document.body) {
+    document.body.classList.toggle('cr-fit-window', isFitToWindow);
+  }
+  const fitBtn = document.getElementById('cr-fit-btn');
+  if (fitBtn) {
+    fitBtn.classList.toggle('active', isFitToWindow);
+  }
+  if (typeof forceState !== 'boolean') {
+    showToast(isFitToWindow ? 'Fit to Window: ON (Press T or Esc to exit)' : 'Fit to Window: OFF');
+  }
+}
+
 // Robust Picture-in-Picture trigger (Native PiP + Floating Mini-Player Fallback)
 async function triggerPictureInPicture() {
   const videos = getActiveVideos();
@@ -2575,6 +2669,23 @@ function handleGlobalKeyDown(e) {
     return;
   }
 
+  // Fit Video to Window: 'T' or 't', and Escape to exit Fit to Window
+  if (e.key === 'Escape' && isFitToWindow && !document.getElementById('cr-command-palette')) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    toggleFitToWindow(false);
+    showToast('Fit to Window: OFF');
+    return;
+  }
+
+  if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (!video && !isTopFrame) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    toggleFitToWindow();
+    return;
+  }
+
   // Picture-in-Picture: 'P' or 'p'
   if ((e.key === 'p' || e.key === 'P' || e.code === 'KeyP') && !e.ctrlKey && !e.metaKey && !e.altKey) {
     if (!video && !isTopFrame) return;
@@ -2612,6 +2723,9 @@ window.addEventListener('load', () => {
 setInterval(() => {
   ensureAppBar();
   if (isTopFrame) {
+    if (isFitToWindow && !window.location.pathname.includes('/watch/')) {
+      toggleFitToWindow(false);
+    }
     updateWatchBarButtonState();
     watchController.initForCurrentPage();
   }
