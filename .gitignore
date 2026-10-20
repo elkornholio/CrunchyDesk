@@ -1,0 +1,12 @@
+node_modules/
+dist/
+WidevineCdm/
+electron-widevine/
+*.pkg.tar.zst
+*.rpm
+*.deb
+*.AppImage
+*.exe
+*.dmg
+*.log
+.DS_Store

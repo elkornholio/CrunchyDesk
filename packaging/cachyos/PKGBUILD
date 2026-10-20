@@ -1,0 +1,63 @@
+# Maintainer: CruncyDesk Contributors
+pkgname=crunchyroll-desktop
+pkgver=1.1.0
+pkgrel=1
+pkgdesc="Cross-platform Crunchyroll desktop client with Widevine DRM, Discord RPC, and Episode Watched/Unwatched tracker"
+arch=('x86_64' 'aarch64')
+url="https://github.com/elkornholio/CrunchyDesk"
+license=('MIT')
+depends=('electron')
+optdepends=(
+  'chromium-widevine: Widevine DRM playback support'
+  'discord: Discord Rich Presence integration'
+)
+source=()
+sha256sums=()
+
+package() {
+  local _project_root
+  _project_root="$(cd "$startdir/../.." && pwd)"
+
+  install -dm755 "$pkgdir/usr/lib/$pkgname"
+  install -Dm644 "$_project_root/main.js" "$pkgdir/usr/lib/$pkgname/main.js"
+  install -Dm644 "$_project_root/preload.js" "$pkgdir/usr/lib/$pkgname/preload.js"
+  install -Dm644 "$_project_root/splash.html" "$pkgdir/usr/lib/$pkgname/splash.html"
+  install -Dm644 "$_project_root/package.json" "$pkgdir/usr/lib/$pkgname/package.json"
+  install -Dm644 "$_project_root/resources/app/icon.png" "$pkgdir/usr/lib/$pkgname/resources/app/icon.png"
+  install -Dm644 "$_project_root/resources/app/icon.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/crunchyroll.png"
+
+  install -dm755 "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/crunchyroll-desktop" << 'EOF'
+#!/bin/bash
+unset ELECTRON_RUN_AS_NODE
+export ELECTRON_FORCE_IS_PACKAGED=0
+for dir in $(ls -d /usr/lib/electron* 2>/dev/null | sort -V -r); do
+  if [ -x "$dir/electron" ]; then
+    exec "$dir/electron" --no-sandbox /usr/lib/crunchyroll-desktop/main.js "$@"
+  fi
+done
+for bin in electron electron43 electron42 electron41 electron40 electron39 electron38 electron37 electron36 electron35; do
+  if command -v "$bin" &>/dev/null; then
+    exec "$bin" --no-sandbox /usr/lib/crunchyroll-desktop/main.js "$@"
+  fi
+done
+exec /usr/bin/electron --no-sandbox /usr/lib/crunchyroll-desktop/main.js "$@"
+EOF
+  chmod 755 "$pkgdir/usr/bin/crunchyroll-desktop"
+
+  install -dm755 "$pkgdir/usr/share/applications"
+  cat > "$pkgdir/usr/share/applications/crunchyroll.desktop" << 'EOF'
+[Desktop Entry]
+Name=Crunchyroll
+GenericName=Anime Streaming Client
+Exec=/usr/bin/crunchyroll-desktop %U
+Icon=crunchyroll
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Player;TV;Entertainment;
+Keywords=anime;crunchyroll;streaming;video;japanese;tv;animation;
+Comment=Unofficial Crunchyroll Desktop Client with Widevine DRM & Episode Tracker
+StartupWMClass=crunchyroll
+StartupNotify=true
+EOF
+}

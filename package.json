@@ -1,0 +1,109 @@
+{
+  "name": "crunchyroll-desktop",
+  "productName": "Crunchyroll",
+  "version": "1.1.0",
+  "description": "Cross-platform Crunchyroll desktop application for CachyOS, Fedora, Windows, and macOS with Widevine DRM, Discord RPC, and Episode Watched/Unwatched management",
+  "main": "main.js",
+  "author": "elkornholio (Based on CodesRahul96/Crunchyroll-Desktop & ThomasTavernier/Improve-Crunchyroll)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elkornholio/CrunchyDesk.git"
+  },
+  "scripts": {
+    "start": "node scripts/launch.js",
+    "electron": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "build:linux": "electron-builder --linux",
+    "build:cachyos": "electron-builder --linux pacman AppImage",
+    "build:fedora": "electron-builder --linux rpm AppImage",
+    "build:deb": "electron-builder --linux deb AppImage",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:all": "electron-builder -mwl"
+  },
+  "dependencies": {
+    "discord-rpc": "^4.0.1"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.codesrahul.crunchyroll",
+    "productName": "Crunchyroll",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "splash.html",
+      "package.json",
+      "scripts/**/*",
+      "resources/**/*"
+    ],
+    "linux": {
+      "maintainer": "CruncyDesk <codesrahul96@gmail.com>",
+      "target": [
+        "AppImage",
+        "pacman",
+        "rpm",
+        "deb"
+      ],
+      "category": "Video;AudioVideo;Entertainment;",
+      "icon": "resources/app/icon.png",
+      "desktop": {
+        "StartupWMClass": "crunchyroll",
+        "Keywords": "anime;crunchyroll;streaming;video;japanese;tv;animation;"
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "resources/app/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Crunchyroll",
+      "runAfterFinish": true,
+      "menuCategory": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.entertainment",
+      "icon": "resources/app/icon.png"
+    },
+    "dmg": {
+      "title": "Crunchyroll Installer",
+      "iconSize": 120,
+      "contents": [
+        {
+          "x": 130,
+          "y": 170,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 170,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 360
+      }
+    }
+  }
+}
